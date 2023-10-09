@@ -35,6 +35,8 @@ pub struct TokenMetadata {
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Token {
     pub owner_id: AccountId,
+    pub approved_account_ids: HashMap<AccountId, u64>,
+    pub next_approval_id: u64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -43,6 +45,7 @@ pub struct JsonToken {
     pub token_id: TokenId,
     pub owner_id: AccountId,
     pub metadata: TokenMetadata,
+    pub approved_account_ids: HashMap<AccountId, u64>,
 }
 
 pub trait NonFungibleTokenMetadata {

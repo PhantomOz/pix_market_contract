@@ -1,5 +1,10 @@
 use crate::*;
 use near_sdk::CryptoHash;
+use std::mem::size_of;
+
+pub(crate) fn bytes_for_approved_account_id(account_id: &AccountId) -> u64 {
+    account_id.as_str().len() as u64 + 4 + size_of::<u64>() as u64
+}
 
 pub(crate) fn hash_account_id(account_id: &AccountId) -> CryptoHash {
     let mut hash = CryptoHash::default();
@@ -66,6 +71,8 @@ impl Contract {
 
         let new_token = Token {
             owner_id: receiver_id.clone(),
+            approved_account_ids: Default::default(),
+            next_approval_id: 0,
         };
 
         self.token_by_id.insert(token_id, &new_token);

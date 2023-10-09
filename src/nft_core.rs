@@ -86,6 +86,7 @@ impl NonFungibleTokenCore for Contract {
                 token_id,
                 owner_id: token.owner_id,
                 metadata,
+                approved_account_ids: token.approved_account_ids,
             })
         } else {
             None
