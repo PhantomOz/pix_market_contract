@@ -7,7 +7,7 @@ use near_sdk::{
     json_types::{Base64VecU8, U128},
     near_bindgen,
     serde::{Deserialize, Serialize},
-    AccountId, Balance, BorshStorageKey, CryptoHash, PanicOnDefault, Promise,
+    AccountId, Balance, BorshStorageKey, CryptoHash, PanicOnDefault, Promise, PromiseOrValue,
 };
 
 pub use crate::approval::*;
