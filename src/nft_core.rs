@@ -5,13 +5,20 @@ const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(10_000_000_000_000);
 const GAS_FOR_NFT_ON_TRANSFER: Gas = Gas(25_000_000_000_000);
 
 pub trait NonFungibleTokenCore {
-    fn nft_transfer(&mut self, receiver_id: AccountId, token_id: TokenId, memo: Option<String>);
+    fn nft_transfer(
+        &mut self,
+        receiver_id: AccountId,
+        token_id: TokenId,
+        memo: Option<String>,
+        approval_id: Option<u64>,
+    );
     fn nft_transfer_call(
         &mut self,
         receiver_id: AccountId,
         token_id: TokenId,
         memo: Option<String>,
         msg: String,
+        approval_id: Option<u64>,
     ) -> PromiseOrValue<bool>;
 
     fn nft_token(&self, token_id: TokenId) -> Option<JsonToken>;
@@ -35,18 +42,31 @@ trait NonFungibleTokenResolver {
         owner_id: AccountId,
         receiver_id: AccountId,
         token_id: TokenId,
+        approved_account_ids: HashMap<AccountId, u64>,
     ) -> bool;
 }
 
 #[near_bindgen]
 impl NonFungibleTokenCore for Contract {
     #[payable]
-    fn nft_transfer(&mut self, receiver_id: AccountId, token_id: TokenId, memo: Option<String>) {
+    fn nft_transfer(
+        &mut self,
+        receiver_id: AccountId,
+        token_id: TokenId,
+        memo: Option<String>,
+        approval_id: Option<u64>,
+    ) {
         assert_one_yocto();
 
         let sender_id = env::predecessor_account_id();
 
-        self.internal_transfer(&sender_id, &receiver_id, &token_id, memo);
+        let previous_token =
+            self.internal_transfer(&sender_id, &receiver_id, &token_id, approval_id, memo);
+
+        refund_approved_account_ids(
+            previous_token.owner_id.clone(),
+            &previous_token.approved_account_ids,
+        );
     }
 
     #[payable]
@@ -56,12 +76,14 @@ impl NonFungibleTokenCore for Contract {
         token_id: TokenId,
         memo: Option<String>,
         msg: String,
+        approval_id: Option<u64>,
     ) -> PromiseOrValue<bool> {
         assert_one_yocto();
 
         let sender_id = env::predecessor_account_id();
 
-        let previous_token = self.internal_transfer(&sender_id, &receiver_id, &token_id, memo);
+        let previous_token =
+            self.internal_transfer(&sender_id, &receiver_id, &token_id, approval_id, memo);
 
         ext_non_fungible_token_receiver::ext(receiver_id.clone())
             .with_static_gas(GAS_FOR_NFT_ON_TRANSFER)
@@ -74,7 +96,12 @@ impl NonFungibleTokenCore for Contract {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
-                    .nft_resolve_transfer(previous_token.owner_id, receiver_id, token_id),
+                    .nft_resolve_transfer(
+                        previous_token.owner_id,
+                        receiver_id,
+                        token_id,
+                        previous_token.approved_account_ids,
+                    ),
             )
             .into()
     }
@@ -102,10 +129,12 @@ impl NonFungibleTokenResolver for Contract {
         owner_id: AccountId,
         receiver_id: AccountId,
         token_id: TokenId,
+        approved_account_ids: HashMap<AccountId, u64>,
     ) -> bool {
         if let PromiseResult::Successful(value) = env::promise_result(0) {
             if let Ok(return_token) = near_sdk::serde_json::from_slice::<bool>(&value) {
                 if !return_token {
+                    refund_approved_account_ids(owner_id, &approved_account_ids);
                     return true;
                 }
             }
@@ -113,10 +142,14 @@ impl NonFungibleTokenResolver for Contract {
 
         let mut token = if let Some(token) = self.token_by_id.get(&token_id) {
             if token.owner_id != receiver_id {
+                refund_approved_account_ids(owner_id, &approved_account_ids);
+
                 return true;
             }
             token
         } else {
+            refund_approved_account_ids(owner_id, &approved_account_ids);
+
             return true;
         };
 
@@ -126,6 +159,8 @@ impl NonFungibleTokenResolver for Contract {
         self.internal_add_token_to_owner(&owner_id, &token_id);
 
         token.owner_id = owner_id;
+        refund_approved_account_ids(receiver_id, &token.approved_account_ids);
+        token.approved_account_ids = approved_account_ids;
         self.token_by_id.insert(&token_id, &token);
 
         false

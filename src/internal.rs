@@ -6,6 +6,26 @@ pub(crate) fn bytes_for_approved_account_id(account_id: &AccountId) -> u64 {
     account_id.as_str().len() as u64 + 4 + size_of::<u64>() as u64
 }
 
+pub(crate) fn refund_approved_account_ids_iter<'a, I>(
+    account_id: AccountId,
+    approved_account_ids: I,
+) -> Promise
+where
+    I: Iterator<Item = &'a AccountId>,
+{
+    let storage_released: u64 = approved_account_ids
+        .map(bytes_for_approved_account_id)
+        .sum();
+    Promise::new(account_id).transfer(Balance::from(storage_released) * env::storage_byte_cost())
+}
+
+pub(crate) fn refund_approved_account_ids(
+    account_id: AccountId,
+    approved_account_ids: &HashMap<AccountId, u64>,
+) -> Promise {
+    refund_approved_account_ids_iter(account_id, approved_account_ids.keys())
+}
+
 pub(crate) fn hash_account_id(account_id: &AccountId) -> CryptoHash {
     let mut hash = CryptoHash::default();
     hash.copy_from_slice(&env::sha256(account_id.as_bytes()));
@@ -54,12 +74,27 @@ impl Contract {
         sender_id: &AccountId,
         receiver_id: &AccountId,
         token_id: &TokenId,
+        approval_id: Option<u64>,
         memo: Option<String>,
     ) -> Token {
         let token = self.token_by_id.get(token_id).expect("No token");
 
         if sender_id != &token.owner_id {
-            env::panic_str("Unauthorized")
+            if !token.approved_account_ids.contains_key(sender_id) {
+                env::panic_str("Unauthorized");
+            }
+
+            if let Some(enforced_approval_id) = approval_id {
+                let actual_approval_id = token
+                    .approved_account_ids
+                    .get(sender_id)
+                    .expect("Sender is not approved account");
+                assert_eq!(
+                    actual_approval_id, &enforced_approval_id,
+                    "The actual approval_id {} is different from the given approval_id {}",
+                    actual_approval_id, enforced_approval_id,
+                );
+            }
         }
         assert_ne!(
             &token.owner_id, receiver_id,

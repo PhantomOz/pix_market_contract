@@ -2,7 +2,12 @@ use crate::*;
 use near_sdk::{assert_one_yocto, ext_contract};
 pub trait NonFungibleTokenCore {
     fn nft_approve(&mut self, token_id: TokenId, account_id: AccountId, msg: Option<String>);
-    fn nft_is_approved(&self, token_id: TokenId, account_id: AccountId) -> bool;
+    fn nft_is_approved(
+        &self,
+        token_id: TokenId,
+        account_id: AccountId,
+        approval_id: Option<u64>,
+    ) -> bool;
     fn nft_revoke(&mut self, token_id: TokenId, account_id: AccountId);
     fn nft_revoke_all(&mut self, token_id: TokenId);
 }
@@ -56,15 +61,54 @@ impl NonFungibleTokenCore for Contract {
         }
     }
 
-    fn nft_is_approved(&self, _token_id: TokenId, _account_id: AccountId) -> bool {
-        todo!()
+    fn nft_is_approved(
+        &self,
+        token_id: TokenId,
+        account_id: AccountId,
+        approval_id: Option<u64>,
+    ) -> bool {
+        let token = self.token_by_id.get(&token_id).expect("No token");
+
+        let approval = token.approved_account_ids.get(&account_id);
+
+        if let Some(approval) = approval {
+            if let Some(approval_id) = approval_id {
+                approval_id == *approval
+            } else {
+                true
+            }
+        } else {
+            false
+        }
     }
 
-    fn nft_revoke(&mut self, _token_id: TokenId, _account_id: AccountId) {
-        todo!()
+    #[payable]
+    fn nft_revoke(&mut self, token_id: TokenId, account_id: AccountId) {
+        assert_one_yocto();
+        let mut token = self.token_by_id.get(&token_id).expect("No token");
+
+        let predecessor_account_id = env::predecessor_account_id();
+        assert_eq!(&predecessor_account_id, &token.owner_id);
+
+        if token.approved_account_ids.remove(&account_id).is_some() {
+            refund_approved_account_ids_iter(predecessor_account_id, [account_id].iter());
+
+            self.token_by_id.insert(&token_id, &token);
+        }
     }
 
-    fn nft_revoke_all(&mut self, _token_id: TokenId) {
-        todo!()
+    #[payable]
+    fn nft_revoke_all(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+
+        let mut token = self.token_by_id.get(&token_id).expect("No token");
+        let predecessor_account_id = env::predecessor_account_id();
+        assert_eq!(&predecessor_account_id, &token.owner_id);
+
+        if !token.approved_account_ids.is_empty() {
+            refund_approved_account_ids(predecessor_account_id, &token.approved_account_ids);
+            token.approved_account_ids.clear();
+            self.token_by_id.insert(&token_id, &token);
+        }
     }
 }
