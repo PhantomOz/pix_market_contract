@@ -1,3 +1,4 @@
+use crate::*;
 pub trait NonFungibleTokenMetadata {
     fn nft_payout(
         &self,

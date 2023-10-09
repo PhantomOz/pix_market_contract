@@ -1,3 +1,5 @@
+use crate::*;
+use near_sdk::ext_contract;
 pub trait NonFungibleTokenCore {
     fn nft_approve(&mut self, token_id: TokenId, account_id: AccountId, msg: Option<String>);
     fn nft_is_approved(&self, token_id: TokenId, account_id: AccountId) -> bool;
