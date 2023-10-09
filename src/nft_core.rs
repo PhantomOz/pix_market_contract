@@ -33,20 +33,20 @@ trait NonFungibleTokenCoreSelf {
 impl NonFungibleTokenCore for Contract {
     fn nft_transfer(
         &mut self,
-        receiver_id: AccountId,
-        token_id: TokenId,
-        approval_id: Option<u64>,
-        memo: Option<String>,
+        _receiver_id: AccountId,
+        _token_id: TokenId,
+        _approval_id: Option<u64>,
+        _memo: Option<String>,
     ) {
         todo!()
     }
     fn nft_transfer_call(
         &mut self,
-        receiver_id: AccountId,
-        token_id: TokenId,
-        approval_id: Option<u64>,
-        memo: Option<String>,
-        msg: String,
+        _receiver_id: AccountId,
+        _token_id: TokenId,
+        _approval_id: Option<u64>,
+        _memo: Option<String>,
+        _msg: String,
     ) {
         todo!()
     }
