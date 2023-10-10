@@ -2,6 +2,10 @@ use crate::*;
 use near_sdk::CryptoHash;
 use std::mem::size_of;
 
+pub(crate) fn royalty_to_payout(percentage: u32, amount_to_pay: Balance) -> U128 {
+    U128((percentage as u128 * amount_to_pay) / 10_000u128)
+}
+
 pub(crate) fn bytes_for_approved_account_id(account_id: &AccountId) -> u64 {
     account_id.as_str().len() as u64 + 4 + size_of::<u64>() as u64
 }
@@ -108,6 +112,7 @@ impl Contract {
             owner_id: receiver_id.clone(),
             approved_account_ids: Default::default(),
             next_approval_id: 0,
+            royalty: token.royalty.clone(), //change this  when listing
         };
 
         self.token_by_id.insert(token_id, &new_token);
