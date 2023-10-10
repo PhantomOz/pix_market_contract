@@ -1,5 +1,5 @@
 use crate::*;
-use near_sdk::{assert_one_yocto, ext_contract, log, Gas, PromiseResult};
+use near_sdk::{assert_one_yocto, ext_contract, Gas, PromiseResult};
 
 const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(10_000_000_000_000);
 const GAS_FOR_NFT_ON_TRANSFER: Gas = Gas(25_000_000_000_000);
@@ -39,10 +39,12 @@ trait NonFungibleTokenReceiver {
 trait NonFungibleTokenResolver {
     fn nft_resolve_transfer(
         &mut self,
+        authorized_id: Option<String>,
         owner_id: AccountId,
         receiver_id: AccountId,
         token_id: TokenId,
         approved_account_ids: HashMap<AccountId, u64>,
+        memo: Option<String>,
     ) -> bool;
 }
 
@@ -82,8 +84,19 @@ impl NonFungibleTokenCore for Contract {
 
         let sender_id = env::predecessor_account_id();
 
-        let previous_token =
-            self.internal_transfer(&sender_id, &receiver_id, &token_id, approval_id, memo);
+        let previous_token = self.internal_transfer(
+            &sender_id,
+            &receiver_id,
+            &token_id,
+            approval_id,
+            memo.clone(),
+        );
+
+        let mut authorized_id = None;
+        //if the sender isn't the owner of the token, we set the authorized ID equal to the sender.
+        if sender_id != previous_token.owner_id {
+            authorized_id = Some(sender_id.to_string());
+        }
 
         ext_non_fungible_token_receiver::ext(receiver_id.clone())
             .with_static_gas(GAS_FOR_NFT_ON_TRANSFER)
@@ -97,10 +110,12 @@ impl NonFungibleTokenCore for Contract {
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
                     .nft_resolve_transfer(
+                        authorized_id,
                         previous_token.owner_id,
                         receiver_id,
                         token_id,
                         previous_token.approved_account_ids,
+                        memo,
                     ),
             )
             .into()
@@ -127,10 +142,12 @@ impl NonFungibleTokenResolver for Contract {
     #[private]
     fn nft_resolve_transfer(
         &mut self,
+        authorized_id: Option<String>,
         owner_id: AccountId,
         receiver_id: AccountId,
         token_id: TokenId,
         approved_account_ids: HashMap<AccountId, u64>,
+        memo: Option<String>,
     ) -> bool {
         if let PromiseResult::Successful(value) = env::promise_result(0) {
             if let Ok(return_token) = near_sdk::serde_json::from_slice::<bool>(&value) {
@@ -144,26 +161,48 @@ impl NonFungibleTokenResolver for Contract {
         let mut token = if let Some(token) = self.token_by_id.get(&token_id) {
             if token.owner_id != receiver_id {
                 refund_approved_account_ids(owner_id, &approved_account_ids);
-
                 return true;
             }
             token
         } else {
             refund_approved_account_ids(owner_id, &approved_account_ids);
-
             return true;
         };
 
-        log!("Return {} from @{} to @{}", token_id, receiver_id, owner_id);
-
-        self.internal_remove_token_from_owner(&receiver_id, &token_id);
+        self.internal_remove_token_from_owner(&receiver_id.clone(), &token_id);
         self.internal_add_token_to_owner(&owner_id, &token_id);
 
-        token.owner_id = owner_id;
-        refund_approved_account_ids(receiver_id, &token.approved_account_ids);
+        token.owner_id = owner_id.clone();
+
+        refund_approved_account_ids(receiver_id.clone(), &token.approved_account_ids);
         token.approved_account_ids = approved_account_ids;
+
         self.token_by_id.insert(&token_id, &token);
 
+        let nft_transfer_log: EventLog = EventLog {
+            // Standard name ("nep171").
+            standard: NFT_STANDARD_NAME.to_string(),
+            // Version of the standard ("nft-1.0.0").
+            version: NFT_METADATA_SPEC.to_string(),
+            // The data related with the event stored in a vector.
+            event: EventLogVariant::NftTransfer(vec![NftTransferLog {
+                // The optional authorized account ID to transfer the token on behalf of the old owner.
+                authorized_id,
+                // The old owner's account ID.
+                old_owner_id: receiver_id.to_string(),
+                // The account ID of the new owner of the token.
+                new_owner_id: owner_id.to_string(),
+                // A vector containing the token IDs as strings.
+                token_ids: vec![token_id.to_string()],
+                // An optional memo to include.
+                memo,
+            }]),
+        };
+
+        //we perform the actual logging
+        env::log_str(&nft_transfer_log.to_string());
+
+        //return false
         false
     }
 }

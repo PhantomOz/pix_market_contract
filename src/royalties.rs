@@ -2,13 +2,7 @@ use near_sdk::assert_one_yocto;
 
 use crate::*;
 trait NonFungibleTokenMe {
-    fn nft_payout(
-        &self,
-        token_id: TokenId,
-        account_id: AccountId,
-        balance: u128,
-        max_len_payout: u32,
-    ) -> Payout;
+    fn nft_payout(&self, token_id: TokenId, balance: u128, max_len_payout: u32) -> Payout;
     fn nft_transfer_payout(
         &mut self,
         receiver_id: AccountId,
@@ -22,13 +16,7 @@ trait NonFungibleTokenMe {
 
 #[near_bindgen]
 impl NonFungibleTokenMe for Contract {
-    fn nft_payout(
-        &self,
-        token_id: TokenId,
-        account_id: AccountId,
-        balance: u128,
-        max_len_payout: u32,
-    ) -> Payout {
+    fn nft_payout(&self, token_id: TokenId, balance: u128, max_len_payout: u32) -> Payout {
         let token = self.token_by_id.get(&token_id).expect("No token");
 
         let owner_id = token.owner_id;
