@@ -1,3 +1,5 @@
+use near_sdk::json_types::U64;
+
 use crate::*;
 
 #[near_bindgen]
@@ -5,12 +7,16 @@ impl Contract {
     #[payable]
     pub fn nft_mint(
         &mut self,
+        id: U64,
         token_id: TokenId,
         metadata: TokenMetadata,
         receiver_id: AccountId,
         perpetual_royalties: Option<HashMap<AccountId, u32>>,
     ) {
         let initial_storage_usage = env::storage_usage();
+
+        // Get the series and how many tokens currently exist (edition number = cur_len + 1)
+        let mut series = self.series_by_id.get(&id.0).expect("Not a series");
 
         //Change this when listing
         let mut royalty = HashMap::new();
@@ -27,6 +33,7 @@ impl Contract {
         // finish up
 
         let token = Token {
+            series_id: id.0,
             owner_id: receiver_id,
             approved_account_ids: Default::default(),
             next_approval_id: 0,
@@ -37,6 +44,7 @@ impl Contract {
             self.token_by_id.insert(&token_id, &token).is_none(),
             "Token already exists"
         );
+        series.tokens.insert(&token_id);
 
         self.token_metadata_by_id.insert(&token_id, &metadata);
 

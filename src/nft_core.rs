@@ -1,8 +1,5 @@
 use crate::*;
-use near_sdk::{assert_one_yocto, ext_contract, Gas, PromiseResult};
-
-const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(10_000_000_000_000);
-const GAS_FOR_NFT_ON_TRANSFER: Gas = Gas(25_000_000_000_000);
+use near_sdk::{assert_one_yocto, ext_contract, PromiseResult};
 
 pub trait NonFungibleTokenCore {
     fn nft_transfer(
@@ -124,7 +121,9 @@ impl NonFungibleTokenCore for Contract {
     fn nft_token(&self, token_id: TokenId) -> Option<JsonToken> {
         if let Some(token) = self.token_by_id.get(&token_id) {
             let metadata = self.token_metadata_by_id.get(&token_id).unwrap();
+
             Some(JsonToken {
+                series_id: token.series_id,
                 token_id,
                 owner_id: token.owner_id,
                 metadata,
