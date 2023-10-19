@@ -45,7 +45,7 @@ trait ExtContract {
 impl NonFungibleTokenCore for Contract {
     #[payable]
     fn nft_approve(&mut self, token_id: TokenId, owner_id: AccountId, msg: Option<String>) {
-        assert_one_yocto();
+        assert_at_least_one_yocto();
         let mut token = self.token_by_id.get(&token_id).expect("No token");
 
         assert_eq!(
