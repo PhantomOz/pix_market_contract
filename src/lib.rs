@@ -21,6 +21,7 @@ pub use crate::royalties::*;
 pub use crate::sale::*;
 pub use crate::sale_views::*;
 pub use crate::series::*;
+pub use crate::user::*;
 
 mod approval;
 mod enumeration;
@@ -33,6 +34,7 @@ mod royalties;
 mod sale;
 mod sale_views;
 mod series;
+mod user;
 
 pub const NFT_METADATA_SPEC: &str = "1.0.0";
 pub const NFT_STANDARD_NAME: &str = "nep171";
@@ -51,6 +53,7 @@ pub struct Contract {
     pub token_per_owner: LookupMap<AccountId, UnorderedSet<TokenId>>,
     pub token_by_id: LookupMap<TokenId, Token>,
     pub token_metadata_by_id: UnorderedMap<TokenId, TokenMetadata>,
+    pub user_metadata_by_owner: UnorderedMap<AccountId, UserMetadata>,
     pub metadata: LazyOption<NFTContractMetadata>,
     pub series_by_id: UnorderedMap<SeriesId, Series>,
     pub series_per_owner: LookupMap<AccountId, UnorderedSet<SeriesId>>,
@@ -65,6 +68,8 @@ pub enum StorageKey {
     TokenPerOwner,
     TokenById,
     TokenMetadataById,
+    UserMetadataByOwner,
+    UserMetadataByOwnerInner { account_id_hash: CryptoHash },
     NFTContractMetadata,
     TokenPerOwnerInner { account_id_hash: CryptoHash },
     SeriesByIdInner { account_id_hash: CryptoHash },
@@ -104,6 +109,7 @@ impl Contract {
             token_per_owner: LookupMap::new(StorageKey::TokenPerOwner),
             token_by_id: LookupMap::new(StorageKey::TokenById),
             token_metadata_by_id: UnorderedMap::new(StorageKey::TokenMetadataById),
+            user_metadata_by_owner: UnorderedMap::new(StorageKey::UserMetadataByOwner),
             series_by_id: UnorderedMap::new(StorageKey::SeriesById),
             series_per_owner: LookupMap::new(StorageKey::SeriesPerOwner),
             metadata: LazyOption::new(

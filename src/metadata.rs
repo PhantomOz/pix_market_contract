@@ -52,6 +52,14 @@ pub struct SeriesMetadata {
     pub banner_media: Option<String>,
 }
 
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct UserMetadata {
+    pub name: Option<String>,
+    pub image_url: Option<String>,
+    pub banner_url: Option<String>,
+}
+
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct Series {
     // Royalty used for all tokens in the collection
